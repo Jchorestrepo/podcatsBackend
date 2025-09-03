@@ -2,6 +2,7 @@
 import os
 import uuid
 import base64
+import re
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
@@ -11,6 +12,18 @@ from .services import gemini, elevenlabs, audio
 
 # Define router
 router = APIRouter()
+
+# --- Helper Function ---
+def sanitize_filename(title: str) -> str:
+    """
+    Sanitizes a string to be used as a valid filename.
+    Replaces spaces with underscores and removes characters that are not
+    alphanumeric, underscores, or hyphens.
+    Limits the length to 200 characters to avoid issues with file systems.
+    """
+    s = title.strip().replace(' ', '_')
+    s = re.sub(r'(?u)[^\w\-\_]', '', s)
+    return s[:200]
 
 # --- Pydantic Models for Request/Response ---
 
@@ -32,9 +45,11 @@ class ScriptRequest(BaseModel):
     presenters: List[PresenterName] = Field(..., min_items=2, max_items=2, description="A list of exactly two presenters with their names.")
 
 class ScriptResponse(BaseModel):
+    title: str
     script: List[ScriptLine]
 
 class AudioFromScriptRequest(BaseModel):
+    title: str = Field(..., description="Title of the podcast.")
     script: List[ScriptLine] = Field(..., description="The script to be converted to audio.")
     presenters: List[Presenter] = Field(..., min_items=2, max_items=2, description="A list of presenters with their names and voice_ids.")
     return_base64: bool = Field(False, description="If true, returns the audio as a Base64 string instead of a URL.")
@@ -52,6 +67,7 @@ class PodcastRequest(BaseModel):
     return_base64: bool = Field(False, description="If true, returns the audio as a Base64 string instead of a URL.")
 
 class PodcastResponse(BaseModel):
+    title: str
     status: str
     script: List[ScriptLine]
     audio_file_url: Optional[str] = None
@@ -78,12 +94,12 @@ async def generate_script_only(request_data: ScriptRequest):
     Receives a transcription and returns a structured JSON script without generating audio.
     """
     try:
-        script = gemini.generate_script(
+        script_data = gemini.generate_script(
             transcription=request_data.transcription,
             style=request_data.style,
             presenters=[p.dict() for p in request_data.presenters]
         )
-        return {"script": script}
+        return script_data
     except HTTPException as e:
         raise e
     except Exception as e:
@@ -114,7 +130,8 @@ async def generate_audio_from_script(request_data: AudioFromScriptRequest, reque
             elevenlabs.generate_audio_for_line(dialogue, voice_id, chunk_path)
             audio_chunks_paths.append(chunk_path)
 
-        final_audio_filename = f"podcast_{podcast_id}.mp3"
+        sanitized_title = sanitize_filename(request_data.title)
+        final_audio_filename = f"{sanitized_title}_{podcast_id}.mp3"
         final_audio_path = os.path.join(FILES_DIR, final_audio_filename)
         audio.combine_audio_files(audio_chunks_paths, final_audio_path)
         audio.cleanup_files(audio_chunks_paths)
@@ -145,11 +162,13 @@ async def generate_podcast(request_data: PodcastRequest, request: Request):
     """
     try:
         # 1. Generate script
-        script = gemini.generate_script(
+        script_data = gemini.generate_script(
             transcription=request_data.transcription,
             style=request_data.style,
             presenters=[p.dict() for p in request_data.presenters]
         )
+        title = script_data["title"]
+        script = script_data["script"]
 
         # 2. Generate audio from the new script
         voice_map = {p.name: p.voice_id for p in request_data.presenters}
@@ -173,13 +192,15 @@ async def generate_podcast(request_data: PodcastRequest, request: Request):
             audio_chunks_paths.append(chunk_path)
 
         # 3. Combine and clean up
-        final_audio_filename = f"podcast_{podcast_id}.mp3"
+        sanitized_title = sanitize_filename(title)
+        final_audio_filename = f"{sanitized_title}_{podcast_id}.mp3"
         final_audio_path = os.path.join(FILES_DIR, final_audio_filename)
         audio.combine_audio_files(audio_chunks_paths, final_audio_path)
         audio.cleanup_files(audio_chunks_paths)
 
         # 4. Prepare response
         response_data = {
+            "title": title,
             "status": "success",
             "script": script,
         }
