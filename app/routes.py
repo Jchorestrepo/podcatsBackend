@@ -27,12 +27,19 @@ def sanitize_filename(title: str) -> str:
 
 # --- Pydantic Models for Request/Response ---
 
-class Presenter(BaseModel):
+# Context-specific presenter models
+class PresenterForScript(BaseModel):
+    name: str = Field(..., description="Name of the presenter.")
+    personality: str = Field(..., description="A brief description of the presenter's personality (e.g., 'Sarcastic and witty', 'Curious and enthusiastic').")
+
+class PresenterForAudio(BaseModel):
     name: str = Field(..., description="Name of the presenter.")
     voice_id: str = Field(..., description="ElevenLabs voice ID for this presenter.")
 
-class PresenterName(BaseModel):
+class PresenterFull(BaseModel):
     name: str = Field(..., description="Name of the presenter.")
+    voice_id: str = Field(..., description="ElevenLabs voice ID for this presenter.")
+    personality: str = Field(..., description="A brief description of the presenter's personality.")
 
 class ScriptLine(BaseModel):
     speaker: str
@@ -42,7 +49,7 @@ class ScriptLine(BaseModel):
 class ScriptRequest(BaseModel):
     transcription: str = Field(..., description="The full text transcription to be converted into a podcast script.")
     style: str = Field("Conversacional", description="Style of the podcast (e.g., 'Educativo', 'Humorístico').")
-    presenters: List[PresenterName] = Field(..., min_items=2, max_items=2, description="A list of exactly two presenters with their names.")
+    presenters: List[PresenterForScript] = Field(..., min_items=2, max_items=2, description="A list of exactly two presenters with their names and personalities.")
 
 class ScriptResponse(BaseModel):
     title: str
@@ -51,7 +58,7 @@ class ScriptResponse(BaseModel):
 class AudioFromScriptRequest(BaseModel):
     title: str = Field(..., description="Title of the podcast.")
     script: List[ScriptLine] = Field(..., description="The script to be converted to audio.")
-    presenters: List[Presenter] = Field(..., min_items=2, max_items=2, description="A list of presenters with their names and voice_ids.")
+    presenters: List[PresenterForAudio] = Field(..., min_items=2, max_items=2, description="A list of presenters with their names and voice_ids.")
     return_base64: bool = Field(False, description="If true, returns the audio as a Base64 string instead of a URL.")
 
 class AudioResponse(BaseModel):
@@ -62,7 +69,7 @@ class AudioResponse(BaseModel):
 # Model for the original all-in-one endpoint
 class PodcastRequest(BaseModel):
     style: str = Field(..., description="Style of the podcast (e.g., 'Educativo', 'Humorístico').")
-    presenters: List[Presenter] = Field(..., min_items=2, max_items=2, description="A list of exactly two presenters.")
+    presenters: List[PresenterFull] = Field(..., min_items=2, max_items=2, description="A list of exactly two presenters with name, voice_id, and personality.")
     transcription: str = Field(..., description="The full text transcription to be converted into a podcast.")
     return_base64: bool = Field(False, description="If true, returns the audio as a Base64 string instead of a URL.")
 

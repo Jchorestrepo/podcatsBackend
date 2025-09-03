@@ -1,227 +1,177 @@
 # AI Podcast Generator
 
-[![Python Version](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/) [![FastAPI](https://img.shields.io/badge/FastAPI-0.100.0-green.svg)](https://fastapi.tiangolo.com/)
+[![Python Version](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/) [![FastAPI](https://img.shields.io/badge/FastAPI-black?logo=fastapi)](https://fastapi.tiangolo.com/) [![Docker](https://img.shields.io/badge/Docker-black?logo=docker)](https://www.docker.com/)
 
-An AI-powered podcast generator that transforms text transcriptions into engaging, multi-speaker audio conversations. This project uses Google's Gemini Pro for script generation and ElevenLabs for realistic text-to-speech synthesis.
+Un generador de podcasts impulsado por IA que transforma transcripciones de texto en conversaciones de audio atractivas con múltiples presentadores. Este proyecto utiliza la API de **Google Gemini** para la generación de guiones y la API de **ElevenLabs** para una síntesis de texto a voz realista.
 
-## Features
+## Características
 
-- **Dynamic Script Generation:** Converts raw text into a conversational podcast script using the Gemini API.
-- **Multi-Speaker Support:** Supports two presenters with distinct voices.
-- **Realistic Voices:** Leverages ElevenLabs' API for high-quality, natural-sounding speech.
-- **Customizable Style:** Allows specifying the podcast's style (e.g., "Educational", "Humorous").
-- **Flexible API:** Provides endpoints to generate a script only, or to generate a full podcast with audio.
-- **Dockerized:** Includes `Dockerfile` and `docker-compose.yml` for easy setup and deployment.
+- **Generación Dinámica de Guiones:** Convierte texto sin formato en un guion de podcast conversacional.
+- **Personalidades de Presentadores:** Asigna personalidades únicas a cada presentador para guiar el tono y estilo del diálogo.
+- **Soporte Multi-presentador:** Admite dos presentadores con voces y personalidades distintas.
+- **Voces Realistas:** Aprovecha la API de ElevenLabs para una síntesis de voz de alta calidad y sonido natural.
+- **Estilo Personalizable:** Permite especificar el estilo del podcast (ej. "Educativo", "Humorístico").
+- **API Flexible:** Ofrece endpoints separados para generar solo el guion o para generar el podcast completo con audio.
+- **Contenerizado:** Incluye `Dockerfile` y `docker-compose.yml` para una configuración y despliegue sencillos.
 
-## Project Structure
+## Cómo Empezar
 
-```
-Podcats/
-├── app/
-│   ├── services/
-│   │   ├── gemini.py       # Gemini API interaction
-│   │   ├── elevenlabs.py   # ElevenLabs API interaction
-│   │   └── audio.py        # Audio processing (combining files)
-│   ├── utils/
-│   │   └── env_loader.py   # Loads environment variables
-│   ├── main.py             # FastAPI app entrypoint
-│   └── routes.py           # API endpoint definitions
-├── files/                  # Directory for generated audio files
-├── .gitignore
-├── Dockerfile
-├── docker-compose.yml
-├── requirements.txt
-└── README.md
-```
+### 1. Prerrequisitos
 
-## Setup and Installation
+- Docker y Docker Compose instalados.
+- Una clave de API para Google Gemini.
+- Una clave de API para ElevenLabs.
 
-### 1. Prerequisites
+### 2. Configuración
 
-- Python 3.9+
-- Docker (optional, for containerized setup)
-- An API key for Google Gemini
-- An API key for ElevenLabs
-
-### 2. Clone the Repository
-
-```bash
-git clone https://github.com/your-username/Podcats.git
-cd Podcats
-```
-
-### 3. Set Up Environment Variables
-
-Create a `.env` file in the root of the project and add your API keys:
-
-```
-GEMINI_API_KEY="YOUR_GEMINI_API_KEY"
-ELEVENLABS_API_KEY="YOUR_ELEVENLABS_API_KEY"
-```
-
-### 4. Install Dependencies
-
-```bash
-pip install -r requirements.txt
-```
-
-## How to Run
-
-### Using Docker (Recommended)
-
-1.  **Build and run the container:**
-
+1.  **Clona el repositorio:**
     ```bash
-    docker-compose up --build
+    git clone https://github.com/tu-usuario/Podcats.git
+    cd Podcats
     ```
 
-2.  The API will be accessible at `http://localhost:8000`.
-
-### Without Docker
-
-1.  **Run the FastAPI server:**
-
+2.  **Crea tu archivo de entorno:**
+    Copia el archivo de ejemplo `.env.example` a un nuevo archivo llamado `.env`.
     ```bash
-    uvicorn app.main:app --reload
+    # En Windows
+    copy .env.example .env
+
+    # En macOS / Linux
+    cp .env.example .env
     ```
 
-2.  The API will be accessible at `http://localhost:8000`.
+3.  **Añade tus claves de API:**
+    Abre el archivo `.env` y reemplaza los valores de marcador de posición con tus claves de API reales.
+    ```env
+    # Rename this file to .env and fill in your API keys.
 
-## API Documentation
+    # Get your API key from Google AI Studio
+    # https://aistudio.google.com/app/apikey
+    GEMINI_API_KEY=TU_API_KEY_DE_GEMINI
 
-The interactive API documentation (powered by Swagger UI) is available at `http://localhost:8000/docs`.
+    # Get your API key from your ElevenLabs profile
+    # https://elevenlabs.io/subscription
+    ELEVENLABS_API_KEY=TU_API_KEY_DE_ELEVENLABS
+    ```
 
-### Endpoints
+### 3. Ejecutar la Aplicación
+
+Una vez que tu archivo `.env` esté configurado, puedes iniciar la aplicación usando Docker Compose:
+
+```bash
+docker-compose up --build
+```
+
+El servidor se iniciará y la API estará disponible en `http://localhost:8000`.
+
+## Documentación de la API
+
+La documentación interactiva completa de la API (generada por Swagger UI) está disponible automáticamente una vez que el servidor está en marcha.
+
+- **URL de la Documentación:** **[http://localhost:8000/docs](http://localhost:8000/docs)**
+
+### Endpoints Principales
+
+A continuación se muestran ejemplos de los endpoints más importantes.
+
+---
 
 #### `POST /generate-script`
 
-Generates a podcast script from a transcription.
+Genera un guion de podcast a partir de una transcripción, teniendo en cuenta la personalidad de los presentadores.
 
-- **Request Body:**
-
+- **Cuerpo de la Petición:**
   ```json
   {
-    "transcription": "The full text to be converted into a script.",
-    "style": "Conversational",
+    "transcription": "La IA está avanzando a un ritmo increíble. Los recientes avances en los modelos de lenguaje grandes han abierto nuevas posibilidades.",
+    "style": "Noticias de Tecnología",
     "presenters": [
-      { "name": "Alice" },
-      { "name": "Bob" }
-    ]
-  }
-  ```
-
-- **Response Body:**
-
-  ```json
-  {
-    "title": "A Creative Title for the Podcast",
-    "script": [
       {
-        "speaker": "Alice",
-        "line": "Hello and welcome to the show."
+        "name": "Alex",
+        "personality": "Entusiasta de la tecnología, siempre optimista sobre el futuro."
       },
       {
-        "speaker": "Bob",
-        "line": "Today, we'll be discussing an interesting topic."
+        "name": "Sara",
+        "personality": "Analista crítica y escéptica, se enfoca en las implicaciones éticas."
       }
     ]
   }
   ```
+
+- **Respuesta Exitosa (200):**
+  ```json
+  {
+    "title": "El Futuro de la Inteligencia Artificial",
+    "script": [
+      {
+        "speaker": "Alex",
+        "line": "¡Bienvenidos de nuevo a 'Tecno-Futuro'!"
+      },
+      {
+        "speaker": "Sara",
+        "line": "Hola a todos. Hoy tenemos un tema que genera tanto entusiasmo como debate."
+      }
+    ]
+  }
+  ```
+
+---
 
 #### `POST /generate-audio-from-script`
 
-Generates an audio file from a script.
+Genera un archivo de audio a partir de un guion y un conjunto de presentadores con sus IDs de voz.
 
-- **Request Body:**
-
+- **Cuerpo de la Petición:**
   ```json
   {
-    "title": "A Creative Title for the Podcast",
+    "title": "El Futuro de la Inteligencia Artificial",
     "script": [
       {
-        "speaker": "Alice",
-        "line": "This is the first line of the podcast."
+        "speaker": "Alex",
+        "line": "¡Bienvenidos de nuevo a 'Tecno-Futuro'!"
       },
       {
-        "speaker": "Bob",
-        "line": "And this is the second line."
+        "speaker": "Sara",
+        "line": "Hola a todos. Hoy tenemos un tema que genera tanto entusiasmo como debate."
       }
     ],
     "presenters": [
       {
-        "name": "Alice",
-        "voice_id": "ELEVENLABS_VOICE_ID_FOR_ALICE"
+        "name": "Alex",
+        "voice_id": "21m00Tcm4TlvDq8ikWAM"
       },
       {
-        "name": "Bob",
-        "voice_id": "ELEVENLABS_VOICE_ID_FOR_BOB"
+        "name": "Sara",
+        "voice_id": "29vD33N1CtxCmqQRPOHJ"
       }
     ],
     "return_base64": false
   }
   ```
 
-- **Response Body (with `return_base64: false`):**
-
+- **Respuesta Exitosa (200):**
   ```json
   {
     "status": "success",
-    "audio_file_url": "http://localhost:8000/files/A_Creative_Title_for_the_Podcast_... .mp3"
+    "audio_file_url": "http://localhost:8000/files/El_Futuro_de_la_Inteligencia_Artificial_....mp3"
   }
   ```
 
-#### `POST /generate-podcast`
+---
 
-An all-in-one endpoint that generates a script and the corresponding audio.
+#### `GET /files/{filename}`
 
-- **Request Body:**
+Sirve un archivo de audio generado previamente. El nombre del archivo se obtiene de la respuesta de los endpoints que generan audio.
 
+---
+
+#### `GET /health`
+
+Un endpoint simple para verificar que el servicio está en funcionamiento.
+
+- **Respuesta Exitosa (200):**
   ```json
   {
-    "style": "Educational",
-    "presenters": [
-      {
-        "name": "Alice",
-        "voice_id": "ELEVENLABS_VOICE_ID_FOR_ALICE"
-      },
-      {
-        "name": "Bob",
-        "voice_id": "ELEVENLABS_VOICE_ID_FOR_BOB"
-      }
-    ],
-    "transcription": "The full text transcription goes here.",
-    "return_base64": false
+    "status": "ok"
   }
   ```
-
-- **Response Body:**
-
-  ```json
-  {
-    "title": "The Generated Podcast Title",
-    "status": "success",
-    "script": [ ... ],
-    "audio_file_url": "http://localhost:8000/files/The_Generated_Podcast_Title_... .mp3"
-  }
-  ```
-
-## Example Usage
-
-You can use a tool like `curl` or `requests` in Python to interact with the API.
-
-### Generate a full podcast using `curl`:
-
-```bash
-curl -X POST "http://localhost:8000/generate-podcast" \
-     -H "Content-Type: application/json" \
-     -d 
-     {
-           "style": "Tech News",
-           "presenters": [
-             { "name": "Alex", "voice_id": "21m00Tcm4TlvDq8ikWAM" },
-             { "name": "Sam", "voice_id": "29vD33N1CtxCmqQRPOHJ" }
-           ],
-           "transcription": "AI is advancing at an incredible pace. Recent breakthroughs in large language models have opened up new possibilities for natural language understanding and generation."
-         }
-```
-
