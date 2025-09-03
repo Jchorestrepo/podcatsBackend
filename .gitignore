@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.env
+.env
+venv/
+ENV/
+*.egg-info/
+*.egg
+*.log
+*.sqlite3
+
+# VSCode
+.vscode/
+
+# Docker
+*.db
+*.pid
+docker-compose.override.yml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Audio files
+files/*.mp3
+
+# Others
+*.bak
+*.swp
+*.tmp

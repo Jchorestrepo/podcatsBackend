@@ -1,0 +1,15 @@
+services:
+  backend:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      # Mount the 'app' directory for live code reloading during development
+      - ./app:/app/app
+      # Mount the 'files' directory to persist generated audio on the host machine
+      - ./files:/app/files
+    env_file:
+      - .env
+    # The command to run the application
+    # --reload will automatically restart the server on code changes
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
