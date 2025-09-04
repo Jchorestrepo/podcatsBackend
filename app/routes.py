@@ -90,8 +90,73 @@ os.makedirs(FILES_DIR, exist_ok=True)
 
 @router.get("/health", summary="Health Check")
 async def health_check():
-    """A simple endpoint to verify that the service is running."""
-    return {"status": "ok"}
+    """
+    A detailed health check endpoint that verifies the service and its dependencies.
+    """
+    gemini_status = gemini.check_gemini_api()
+    elevenlabs_status = elevenlabs.check_elevenlabs_api()
+
+    overall_status = "ok" if gemini_status["status"] == "ok" and elevenlabs_status["status"] == "ok" else "error"
+
+    return {
+        "status": overall_status,
+        "dependencies": {
+            "gemini_api": gemini_status,
+            "elevenlabs_api": elevenlabs_status
+        }
+    }
+
+# --- Helper Function for Audio Generation ---
+
+def _generate_audio_and_get_response(
+    title: str,
+    script: List[ScriptLine],
+    presenters: List[PresenterForAudio],
+    return_base64: bool,
+    base_url: str
+) -> dict:
+    """
+    Handles the logic for generating audio from a script, combining files,
+    and returning the appropriate response (URL or Base64).
+    """
+    voice_map = {p.name: p.voice_id for p in presenters}
+    audio_chunks_paths = []
+    podcast_id = str(uuid.uuid4())
+
+    for i, line in enumerate(script):
+        speaker_name = line.speaker
+        dialogue = line.line
+        
+        voice_id = voice_map.get(speaker_name)
+        if not voice_id:
+            print(f"Warning: Speaker '{speaker_name}' not found in presenters list. Skipping line.")
+            continue
+
+        chunk_path = os.path.join(FILES_DIR, f"{podcast_id}_chunk_{i}.mp3")
+        elevenlabs.generate_audio_for_line(dialogue, voice_id, chunk_path)
+        audio_chunks_paths.append(chunk_path)
+
+    sanitized_title = sanitize_filename(title)
+    final_audio_filename = f"{sanitized_title}_{podcast_id}.mp3"
+    final_audio_path = os.path.join(FILES_DIR, final_audio_filename)
+    
+    try:
+        audio.combine_audio_files(audio_chunks_paths, final_audio_path)
+    finally:
+        audio.cleanup_files(audio_chunks_paths)
+
+    response_data = {"status": "success"}
+    if return_base64:
+        try:
+            with open(final_audio_path, "rb") as audio_file:
+                encoded_string = base64.b64encode(audio_file.read()).decode('utf-8')
+            response_data["audio_base64"] = encoded_string
+        finally:
+            audio.cleanup_files([final_audio_path])
+    else:
+        response_data["audio_file_url"] = f"{base_url}files/{final_audio_filename}"
+        
+    return response_data
 
 # --- NEW ENDPOINTS ---
 
@@ -118,42 +183,14 @@ async def generate_audio_from_script(request_data: AudioFromScriptRequest, reque
     Receives a structured JSON script and generates the final audio file.
     """
     try:
-        script = request_data.script
-        voice_map = {p.name: p.voice_id for p in request_data.presenters}
-        
-        audio_chunks_paths = []
-        podcast_id = str(uuid.uuid4())
-
-        for i, line in enumerate(script):
-            speaker_name = line.speaker
-            dialogue = line.line
-            
-            voice_id = voice_map.get(speaker_name)
-            if not voice_id:
-                print(f"Warning: Speaker '{speaker_name}' not found in presenters list. Skipping line.")
-                continue
-
-            chunk_path = os.path.join(FILES_DIR, f"{podcast_id}_chunk_{i}.mp3")
-            elevenlabs.generate_audio_for_line(dialogue, voice_id, chunk_path)
-            audio_chunks_paths.append(chunk_path)
-
-        sanitized_title = sanitize_filename(request_data.title)
-        final_audio_filename = f"{sanitized_title}_{podcast_id}.mp3"
-        final_audio_path = os.path.join(FILES_DIR, final_audio_filename)
-        audio.combine_audio_files(audio_chunks_paths, final_audio_path)
-        audio.cleanup_files(audio_chunks_paths)
-
-        response_data = {"status": "success"}
-        if request_data.return_base64:
-            with open(final_audio_path, "rb") as audio_file:
-                encoded_string = base64.b64encode(audio_file.read()).decode('utf-8')
-            response_data["audio_base64"] = encoded_string
-            audio.cleanup_files([final_audio_path])
-        else:
-            base_url = str(request.base_url)
-            response_data["audio_file_url"] = f"{base_url}files/{final_audio_filename}"
-            
-        return response_data
+        response = _generate_audio_and_get_response(
+            title=request_data.title,
+            script=request_data.script,
+            presenters=request_data.presenters,
+            return_base64=request_data.return_base64,
+            base_url=str(request.base_url)
+        )
+        return response
     except HTTPException as e:
         raise e
     except Exception as e:
@@ -175,52 +212,28 @@ async def generate_podcast(request_data: PodcastRequest, request: Request):
             presenters=[p.dict() for p in request_data.presenters]
         )
         title = script_data["title"]
-        script = script_data["script"]
+        
+        # Convert script from list of dicts to list of ScriptLine objects
+        script_objects = [ScriptLine(**line) for line in script_data["script"]]
 
-        # 2. Generate audio from the new script
-        voice_map = {p.name: p.voice_id for p in request_data.presenters}
-        audio_chunks_paths = []
-        podcast_id = str(uuid.uuid4())
+        # 2. Generate audio using the helper function
+        audio_response = _generate_audio_and_get_response(
+            title=title,
+            script=script_objects,
+            presenters=request_data.presenters,
+            return_base64=request_data.return_base64,
+            base_url=str(request.base_url)
+        )
 
-        for i, line in enumerate(script):
-            speaker_name = line.get("speaker")
-            dialogue = line.get("line")
-            
-            if not speaker_name or not dialogue:
-                continue
-
-            voice_id = voice_map.get(speaker_name)
-            if not voice_id:
-                print(f"Warning: Speaker '{speaker_name}' not found in presenters list. Skipping line.")
-                continue
-
-            chunk_path = os.path.join(FILES_DIR, f"{podcast_id}_chunk_{i}.mp3")
-            elevenlabs.generate_audio_for_line(dialogue, voice_id, chunk_path)
-            audio_chunks_paths.append(chunk_path)
-
-        # 3. Combine and clean up
-        sanitized_title = sanitize_filename(title)
-        final_audio_filename = f"{sanitized_title}_{podcast_id}.mp3"
-        final_audio_path = os.path.join(FILES_DIR, final_audio_filename)
-        audio.combine_audio_files(audio_chunks_paths, final_audio_path)
-        audio.cleanup_files(audio_chunks_paths)
-
-        # 4. Prepare response
+        # 3. Prepare final response
         response_data = {
             "title": title,
-            "status": "success",
-            "script": script,
+            "status": audio_response.get("status", "failed"),
+            "script": script_objects,
+            "audio_file_url": audio_response.get("audio_file_url"),
+            "audio_base64": audio_response.get("audio_base64"),
         }
-
-        if request_data.return_base64:
-            with open(final_audio_path, "rb") as audio_file:
-                encoded_string = base64.b64encode(audio_file.read()).decode('utf-8')
-            response_data["audio_base64"] = encoded_string
-            audio.cleanup_files([final_audio_path])
-        else:
-            base_url = str(request.base_url)
-            response_data["audio_file_url"] = f"{base_url}files/{final_audio_filename}"
-            
+        
         return response_data
 
     except HTTPException as e:

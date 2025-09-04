@@ -4,7 +4,7 @@ import requests
 from fastapi import HTTPException
 
 ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY")
-ELEVENLABS_API_URL = "https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
+ELEVENLABS_API_URL_BASE = "https://api.elevenlabs.io/v1"
 
 def generate_audio_for_line(line: str, voice_id: str, output_path: str):
     """
@@ -28,7 +28,7 @@ def generate_audio_for_line(line: str, voice_id: str, output_path: str):
     }
     data = {
         "text": line,
-        "model_id": "eleven_multilingual_v2",
+        "model_id": os.getenv("ELEVENLABS_MODEL_ID", "eleven_multilingual_v2"),
         "voice_settings": {
             "stability": 0.5,
             "similarity_boost": 0.75
@@ -36,12 +36,8 @@ def generate_audio_for_line(line: str, voice_id: str, output_path: str):
     }
 
     try:
-        response = requests.post(
-            ELEVENLABS_API_URL.format(voice_id=voice_id),
-            headers=headers,
-            json=data,
-            timeout=60
-        )
+        url = f"{ELEVENLABS_API_URL_BASE}/text-to-speech/{voice_id}"
+        response = requests.post(url, headers=headers, json=data, timeout=60)
         response.raise_for_status()
 
         with open(output_path, 'wb') as f:
@@ -51,3 +47,19 @@ def generate_audio_for_line(line: str, voice_id: str, output_path: str):
 
     except requests.exceptions.RequestException as e:
         raise HTTPException(status_code=500, detail=f"Error calling ElevenLabs API: {e}")
+
+def check_elevenlabs_api():
+    """
+    Checks if the ElevenLabs API is available.
+    """
+    if not ELEVENLABS_API_KEY:
+        return {"status": "error", "message": "ELEVENLABS_API_KEY is not set."}
+
+    headers = {"xi-api-key": ELEVENLABS_API_KEY}
+    try:
+        url = f"{ELEVENLABS_API_URL_BASE}/voices"
+        response = requests.get(url, headers=headers, timeout=10)
+        response.raise_for_status()
+        return {"status": "ok"}
+    except requests.exceptions.RequestException as e:
+        return {"status": "error", "message": str(e)}
